@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Happy Birthday Surprise</title>
+<style>
+  :root{
+    --bg:#020217;
+    --panel: rgba(0,0,0,0.46);
+    --accent: #ff6b9a;
+    --glass: rgba(255,255,255,0.04);
+    --text: #f7f7fb;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;color:var(--text);overflow:hidden}
+  canvas{position:fixed;left:0;top:0;width:100%;height:100%;z-index:0;display:block}
+  /* Start screen */
+  #startScreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:8;padding:18px;background:linear-gradient(180deg, rgba(2,2,23,0.6), rgba(2,2,23,0.5))}
+  .card{width:100%;max-width:840px;background:var(--panel);border-radius:14px;padding:22px;box-shadow:0 20px 50px rgba(0,0,0,0.6);backdrop-filter:blur(6px);color:var(--text)}
+  .card h1{margin:0 0 6px 0;font-size:1.5rem}
+  .card p{margin:0 0 14px 0;color:#d6d6f0cc}
+  .form-row{display:flex;gap:12px;flex-wrap:wrap}
+  input[type="text"], input[type="date"]{flex:1 1 220px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:var(--glass);color:var(--text);outline:none;font-size:1rem}
+  .controls{margin-top:14px;display:flex;gap:12px;align-items:center}
+  button{padding:12px 16px;border-radius:10px;border:0;cursor:pointer;font-size:1rem;color:#111;background:linear-gradient(90deg,#ffd1e6,#ffa6dd);box-shadow:0 6px 18px rgba(255,100,170,0.12)}
+  .secondary{background:transparent;color:var(--text);border:1px solid rgba(255,255,255,0.06)}
+  .small{font-size:0.92rem;color:#ddd7;margin-left:auto}
+  /* Message panel */
+  #messagePanel{position:fixed;z-index:9;left:50%;transform:translateX(-50%);bottom:5vh;width:calc(100% - 40px);max-width:980px;background:linear-gradient(90deg, rgba(0,0,0,0.45), rgba(255,255,255,0.02));border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,0.6);color:var(--text);font-size:18px;line-height:1.6;max-height:55vh;overflow:auto;backdrop-filter:blur(6px)}
+  #greeting{font-size:1.25rem;font-weight:800;margin-bottom:8px;color:#fff;text-shadow:0 2px 14px rgba(255,90,160,0.06)}
+  #messageText{white-space:pre-wrap;opacity:0;transform:translateY(8px);transition:opacity 1s ease, transform 1s ease}
+  #messageText.show{opacity:1;transform:translateY(0)}
+  /* small top overlay with name & DOB */
+  #topInfo{position:fixed;top:18px;left:18px;z-index:9;background:linear-gradient(90deg, rgba(0,0,0,0.45), rgba(255,255,255,0.02));padding:10px 14px;border-radius:10px;color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,0.6);backdrop-filter:blur(6px)}
+  #controlsMini{position:fixed;top:18px;right:18px;z-index:9;display:flex;gap:8px}
+  .miniBtn{padding:8px 10px;border-radius:10px;border:0;cursor:pointer;background:linear-gradient(90deg,#ffd1e6,#ffa6dd);color:#111}
+  /* confetti/balloons controls at bottom-left */
+  #hints{position:fixed;left:18px;bottom:18px;z-index:9;color:#fff;background:rgba(0,0,0,0.28);padding:8px 12px;border-radius:10px;font-size:13px}
+  /* mobile adjustments */
+  @media (max-width:640px){
+    .card{padding:16px}
+    #messagePanel{font-size:15px;padding:14px}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- Top small info -->
+<div id="topInfo" style="display:none">
+  <div id="toName"></div>
+  <div id="toDob" style="font-size:13px;color:#d6d6f0cc"></div>
+</div>
+
+<!-- Controls top-right -->
+<div id="controlsMini" style="display:none">
+  <button class="miniBtn" id="btnPause">Pause</button>
+  <button class="miniBtn" id="btnResume" style="display:none">Resume</button>
+  <button class="miniBtn" id="btnToggleSound">Sound Off</button>
+</div>
+
+<!-- Start screen -->
+<div id="startScreen">
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="startTitle">
+    <h1 id="startTitle">A Special Surprise — Enter details</h1>
+    <p>Enter your girlfriend's name and date of birth. Tap Start to begin the animated surprise (audio will play after you press Start).</p>
+
+    <div class="form-row">
+      <input id="inputName" type="text" placeholder="Enter her name (e.g., Dhanu)" />
+      <input id="inputDob" type="date" />
+    </div>
+
+    <div class="controls">
+      <button id="startBtn">Start Surprise</button>
+      <button id="previewBtn" class="secondary">Preview Without Audio</button>
+      <span class="small">Tap anywhere on screen to trigger more blasts.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Message Panel -->
+<div id="messagePanel" style="display:none">
+  <div id="greeting"></div>
+  <div id="messageText"></div>
+</div>
+
+<div id="hints">Tip: Click/tap anywhere to make crackers. Use Pause to stop animation.</div>
+
+<script>
+/* ========== EXACT MESSAGE (verbatim) ========== */
+const BIRTHDAY_MESSAGE = Happy birthday to my dhana I hope you will be very happy today and also with me  My love I always pray that God that my sweet heart will be so happy for hundreds of years with me my cutie I'm so blessed that I got you in this big world  I promise you that I will keep you happy more and more every day  And my love for is infinite my cutie sonaa motkiiii I love forever and ever and ever and ever,,, 💋😘🐼💋 my gelu pila suna pandu love you so much my hati  In my life I'm so happy from last three years and that credit goes you my baby You are always taking care mine like a kid which was really an awesome treat for me ever so I did this small surprise for you  nd I hope you will like it my baby be mine forever my dear dhaana pandu gelu pila and once again a big big big and lots of kisii and lots of love from u r bogaaa dear and let's celebrate this together my duki bogii pila and once so many happy returns of the day 🎊🎈 🐼😘🐘🎊🎊🥳🥳🥳🎉🎉🎉🐻 gelu;
+
+/* ========== Canvas & animation setup ========== */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { alpha: true });
+
+let W = innerWidth;
+let H = innerHeight;
+canvas.width = W * devicePixelRatio;
+canvas.height = H * devicePixelRatio;
+canvas.style.width = W + 'px';
+canvas.style.height = H + 'px';
+ctx.scale(devicePixelRatio, devicePixelRatio);
+
+window.addEventListener('resize', () => {
+  W = innerWidth; H = innerHeight;
+  canvas.width = W * devicePixelRatio;
+  canvas.height = H * devicePixelRatio;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+});
+
+/* Utility */
+function rand(min, max){ return Math.random()*(max-min)+min }
+function randInt(min,max){ return Math.floor(rand(min,max+1)) }
+function lerp(a,b,t){ return a + (b-a)*t }
+
+/* Particle classes */
+class Particle {
+  constructor(x,y,vx,vy,color,life,size,gravity=false,fade=true){
+    this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.color=color;this.life=life;this.maxLife=life;
+    this.size=size;this.gravity=gravity;this.fade=fade;
+  }
+  update(dt){
+    this.x += this.vx*dt;
+    this.y += this.vy*dt;
+    if(this.gravity) this.vy += 200*dt;
+    this.life -= dt;
+  }
+  draw(ctx){
+    if(this.life<=0) return;
+    const t = Math.max(0, this.life/this.maxLife);
+    ctx.save();
+    ctx.globalAlpha = this.fade ? t : 1;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.size*Math.max(0.2,t),0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* Fireworks model: rockets -> explode into particles */
+let rockets = [];
+let particles = [];
+let confetti = [];
+let balloons = [];
+let lastSpawn = 0;
+let running = true;
+let soundOn = true;
+
+/* Audio: WebAudio context and explosion generator */
+let audioCtx = null;
+function ensureAudio(){
+  if(audioCtx) return audioCtx;
+  try{
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }catch(e){ audioCtx = null; }
+  return audioCtx;
+}
+
+/* explosion sound using noise burst + oscillator */
+function playExplosion(volume=0.8,pitch=200){
+  if(!soundOn) return;
+  const ac = ensureAudio();
+  if(!ac) return;
+  const now = ac.currentTime;
+  // noise burst
+  const bufferSize = ac.sampleRate * 0.3;
+  const noiseBuffer = ac.createBuffer(1, bufferSize, ac.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for(let i=0;i<bufferSize;i++){
+    // envelope for crackling
+    const env = 1 - i / bufferSize;
+    data[i] = (Math.random()*2-1) * env * 0.6;
+  }
+  const nb = ac.createBufferSource();
+  nb.buffer = noiseBuffer;
+  const noiseFilter = ac.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = Math.min(1200, pitch*3);
+  nb.connect(noiseFilter);
+
+  const noiseGain = ac.createGain();
+  noiseGain.gain.setValueAtTime(volume*0.6, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0001, now+0.6);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(ac.destination);
+  nb.start(now);
+
+  // shimmering oscillator for the boom
+  const osc = ac.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(pitch, now);
+  osc.frequency.exponentialRampToValueAtTime(50, now+0.55);
+  const oscGain = ac.createGain();
+  oscGain.gain.setValueAtTime(volume*0.8, now);
+  oscGain.gain.exponentialRampToValueAtTime(0.0001, now+0.6);
+  osc.connect(oscGain);
+  oscGain.connect(ac.destination);
+  osc.start(now);
+  osc.stop(now+0.7);
+
+  // small crackling with filtered noise for sparkle
+  const sparkleBuf = ac.createBuffer(1, ac.sampleRate*0.4, ac.sampleRate);
+  const sdat = sparkleBuf.getChannelData(0);
+  for(let i=0;i<sdat.length;i++){
+    sdat[i] = (Math.random()*2-1)*Math.pow(1 - i/sdat.length, 2);
+  }
+  const ssrc = ac.createBufferSource();
+  ssrc.buffer = sparkleBuf;
+  const sFilt = ac.createBiquadFilter();
+  sFilt.type = 'highpass';
+  sFilt.frequency.value = 1200;
+  ssrc.connect(sFilt);
+  const sGain = ac.createGain();
+  sGain.gain.setValueAtTime(volume*0.3, now);
+  sGain.gain.exponentialRampToValueAtTime(0.0001, now+0.5);
+  sFilt.connect(sGain);
+  sGain.connect(ac.destination);
+  ssrc.start(now);
+}
+
+/* spawn rocket that flies up then explodes */
+function spawnRocket(sx){
+  const x = sx !== undefined ? sx : rand(100, W-100);
+  const y = H + 10;
+  const vx = rand(-30,30);
+  const vy = rand(-500,-700);
+  rockets.push({x,y,vx,vy,ttl: rand(1.2,1.8),trail:[]});
+}
+
+/* spawn explosion at x,y */
+function explode(x,y,color,count=80,force=1.0){
+  // play sound
+  playExplosion(0.8*force, rand(220,650));
+  // bright core particles
+  for(let i=0;i<count;i++){
+    const a = rand(0, Math.PI*2);
+    const s = Math.cos(rand(0,Math.PI/2))*rand(50,420)*force;
+    const vx = Math.cos(a)*s;
+    const vy = Math.sin(a)*s;
+    const col = color || hsl(${randInt(0,360)},${randInt(70,100)}%,${randInt(45,68)}%);
+    particles.push(new Particle(x,y,vx,vy,col,rand(1.2,2.6), rand(1.6,2.6), true));
+  }
+  // sparks
+  for(let i=0;i<30;i++){
+    const a = rand(0, Math.PI*2);
+    const s = rand(80,340)*force;
+    const vx = Math.cos(a)*s;
+    const vy = Math.sin(a)*s;
+    particles.push(new Particle(x,y,vx,vy,'#fff',rand(0.6,1.1),rand(0.8,1.6),true));
+  }
+  // confetti shards
+  for(let i=0;i<20;i++){
+    const vx = rand(-200,200)*force;
+    const vy = rand(-100,400)*force;
+    const c = hsl(${randInt(0,360)},${randInt(60,100)}%,${randInt(40,65)}%);
+    confetti.push({x,y,vx,vy,rot:rand(0,Math.PI*2),spin:rand(-6,6),color:c,life:rand(2.5,4)});
+  }
+}
+
+/* balloons: spawn occasionally */
+function spawnBalloon(){
+  const x = rand(40,W-40);
+  const y = H + 40;
+  const vx = rand(-20,20);
+  const vy = rand(-40,-80);
+  const color = hsl(${randInt(0,360)},${randInt(60,100)}%,${randInt(45,70)}%);
+  balloons.push({x,y,vx,vy,color,ropeLen:rand(40,90),osc:rand(0.5,1.3)});
+}
+
+/* main loop */
+let lastTime = performance.now();
+function loop(t){
+  if(!running){ lastTime = t; requestAnimationFrame(loop); return; }
+  const dt = Math.min(0.04, (t - lastTime)/1000);
+  lastTime = t;
+
+  // fade background for motion blur
+  ctx.fillStyle = 'rgba(2,2,23,0.25)';
+  ctx.fillRect(0,0,W,H);
+
+  // spawn rockets automatically
+  lastSpawn += dt;
+  if(lastSpawn > 0.45){
+    lastSpawn = 0;
+    if(Math.random() < 0.85) spawnRocket();
+  }
+
+  // update rockets
+  for(let i=rockets.length-1;i>=0;i--){
+    const r = rockets[i];
+    r.x += r.vx*dt;
+    r.y += r.vy*dt;
+    r.vy += 120*dt; // gravity
+    r.ttl -= dt;
+    // trail
+    r.trail.push({x:r.x,y:r.y});
+    if(r.trail.length>10) r.trail.shift();
+    // draw rocket
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,230,200,0.9)';
+    ctx.lineWidth = 2;
+    ctx.moveTo(r.x, r.y);
+    const trailLen = r.trail.length;
+    for(let j=trailLen-1;j>=0;j--){
+      const p = r.trail[j];
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+
+    if(r.ttl <= 0 || r.vy > -60){
+      // explode
+      const color = hsl(${randInt(0,360)},${randInt(70,100)}%,${randInt(45,68)}%);
+      explode(r.x, r.y, color, randInt(50,130), rand(0.6,1.6));
+      rockets.splice(i,1);
+    }
+  }
+
+  // update particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.update(dt);
+    if(p.life <= 0) particles.splice(i,1);
+    else p.draw(ctx);
+  }
+
+  // confetti update
+  for(let i=confetti.length-1;i>=0;i--){
+    const c = confetti[i];
+    c.x += c.vx*dt;
+    c.y += c.vy*dt;
+    c.vy += 200*dt;
+    c.rot += c.spin*dt;
+    c.life -= dt;
+    if(c.life <= 0) confetti.splice(i,1);
+    else {
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.rot);
+      ctx.fillStyle = c.color;
+      ctx.fillRect(-4,-6,8,12);
+      ctx.restore();
+    }
+  }
+
+  // balloons
+  for(let i=balloons.length-1;i>=0;i--){
+    const b = balloons[i];
+    b.x += b.vx*dt + Math.sin(t/1000 * b.osc)*10*dt;
+    b.y += b.vy*dt;
+    // rope
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1.2;
+    ctx.moveTo(b.x, b.y + 16);
+    ctx.lineTo(b.x, b.y + b.ropeLen);
+    ctx.stroke();
+    // body
+    ctx.beginPath();
+    const g = ctx.createRadialGradient(b.x - 6, b.y - 8, 2, b.x, b.y, 60);
+    g.addColorStop(0, '#fff9');
+    g.addColorStop(0.2, b.color);
+    g.addColorStop(1, 'rgba(0,0,0,0.05)');
+    ctx.fillStyle = g;
+    ctx.ellipse(b.x, b.y, 18, 24, Math.sin(b.x*0.01)*0.2, 0, Math.PI*2);
+    ctx.fill();
+    if(b.y < -100) balloons.splice(i,1);
+  }
+
+  requestAnimationFrame(loop);
+}
+
+/* Initialize some periodic balloon spawns */
+setInterval(()=>{ if(Math.random()<0.6) spawnBalloon(); }, 2000);
+
+/* click to spawn rocket/explosion */
+canvas.addEventListener('pointerdown', (e)=>{
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  // spawn upward rocket from bottom near click x
+  spawnRocket(x + rand(-20,20));
+  // also small immediate explosion at click for "cracker" feel
+  explode(x, e.clientY, hsl(${randInt(0,360)},${randInt(60,100)}%,${randInt(45,68)}%), randInt(20,60), 0.9);
+});
+
+/* Controls (start screen and message behavior) */
+const startScreen = document.getElementById('startScreen');
+const inputName = document.getElementById('inputName');
+const inputDob = document.getElementById('inputDob');
+const startBtn = document.getElementById('startBtn');
+const previewBtn = document.getElementById('previewBtn');
+const messagePanel = document.getElementById('messagePanel');
+const greetingEl = document.getElementById('greeting');
+const messageTextEl = document.getElementById('messageText');
+const topInfo = document.getElementById('topInfo');
+const toName = document.getElementById('toName');
+const toDob = document.getElementById('toDob');
+const controlsMini = document.getElementById('controlsMini');
+const btnPause = document.getElementById('btnPause');
+const btnResume = document.getElementById('btnResume');
+const btnToggleSound = document.getElementById('btnToggleSound');
+
+function formatDOB(d){
+  if(!d) return '';
+  const dt = new Date(d);
+  if(isNaN(dt)) return '';
+  return dt.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+}
+
+function startSurprise(useAudio=true){
+  // resume or initialize audio on user gesture
+  if(useAudio){
+    const ac = ensureAudio();
+    if(ac && ac.state === 'suspended') ac.resume();
+  }
+  // hide start screen
+  startScreen.style.display = 'none';
+  // show top info
+  topInfo.style.display = 'block';
+  controlsMini.style.display = 'flex';
+  // update top text
+  const name = inputName.value.trim() || 'My Love';
+  toName.textContent = To: ${name};
+  toDob.textContent = inputDob.value ? DOB: ${formatDOB(inputDob.value)} : '';
+  // show message panel
+  messagePanel.style.display = 'block';
+  greetingEl.textContent = Happy Birthday ${name}!;
+  // insert message slowly (slow-motion)
+  messageTextEl.textContent = ''; // reset
+  messageTextEl.classList.remove('show');
+  // reveal message character by character (very slow for "slow motion")
+  const full = BIRTHDAY_MESSAGE;
+  let i = 0;
+  const slowSpeed = 24; // ms per char (lower = faster). I'll use 24ms for moderate; to make "slow motion" we use 55ms
+  const revealDelay = 55; // ms between chars
+  function reveal(){
+    if(i >= full.length){
+      messageTextEl.classList.add('show');
+      return;
+    }
+    messageTextEl.textContent += full[i++];
+    // occasionally add a soft sparkle sound for emphasis on punctuation
+    if((i%20===0 || /[.,!]/.test(full[i])) && soundOn){
+      playExplosion(0.12, rand(120,800));
+    }
+    setTimeout(reveal, revealDelay);
+  }
+  reveal();
+
+  // also kickstart a couple of rockets for spectacle
+  for(let j=0;j<3;j++){
+    setTimeout(()=>spawnRocket(), j*350);
+  }
+}
+
+/* Buttons */
+startBtn.addEventListener('click', async ()=>{
+  // require a name and dob? not mandatory; we allow empty but prefer name
+  // Ensure audio context created on gesture
+  if(!audioCtx){
+    ensureAudio();
+  }
+  // If audio context exists and suspended, resume
+  if(audioCtx && audioCtx.state === 'suspended'){
+    try{ await audioCtx.resume(); }catch(e){}
+  }
+  startSurprise(true);
+  requestAnimationFrame(loop);
+});
+
+previewBtn.addEventListener('click', ()=>{
+  // preview without audio
+  soundOn = false;
+  btnToggleSound.textContent = 'Sound Off';
+  startSurprise(false);
+  requestAnimationFrame(loop);
+});
+
+btnPause.addEventListener('click', ()=>{
+  running = false;
+  btnPause.style.display = 'none';
+  btnResume.style.display = '';
+});
+
+btnResume.addEventListener('click', ()=>{
+  running = true;
+  lastTime = performance.now();
+  btnResume.style.display = 'none';
+  btnPause.style.display = '';
+});
+
+btnToggleSound.addEventListener('click', ()=>{
+  soundOn = !soundOn;
+  btnToggleSound.textContent = soundOn ? 'Sound On' : 'Sound Off';
+});
+
+/* small keyboard controls for convenience (space to spawn rocket) */
+window.addEventListener('keydown', (e)=>{
+  if(e.code === 'Space'){
+    e.preventDefault();
+    spawnRocket();
+  }
+});
+
+/* Kick off idle gentle background motion */
+for(let i=0;i<3;i++) spawnBalloon();
+
+/* Accessibility: allow pressing Enter on name/dob to start */
+[inputName, inputDob].forEach(el=>{
+  el.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ startBtn.click(); }});
+});
+
+/* Start page hint: focus name */
+inputName.focus();
+
+/* Ensure audio gestures: clicking start already does. Provide fallback to resume if user clicks canvas when audio suspended */
+canvas.addEventListener('pointerdown', async ()=>{
+  if(audioCtx && audioCtx.state === 'suspended'){ try{ await audioCtx.resume(); }catch(e){} }
+});
+
+</script>
+</body>
+</html>
